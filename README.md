@@ -6,7 +6,7 @@ This project is the backend for the NAPFA (National Physical Fitness Assessment)
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/AhsanRao/napfa-backend.git
+    git clone https://github.com/AhsanRao/NAPFA-Backend.git
     cd napfa-backend
     ```
 
