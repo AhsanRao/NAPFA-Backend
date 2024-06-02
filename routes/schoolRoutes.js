@@ -14,11 +14,65 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Create a new school admin portal
+router.post("/admin", async (req, res) => {
+    try {
+      const { schoolName, email, createDefaultLicenses } = req.body;
+      const schoolRef = await req.db.collection("Schools").add({ schoolName, email });
+  
+      if (createDefaultLicenses) {
+        const licensesRef = schoolRef.collection("Licenses");
+        const licenseRef = await licensesRef.add({
+          issuedDate: new Date().toISOString(),
+          expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          status: "active",
+          deviceName: "",
+        });
+      }
+  
+      res.status(201).send({ id: schoolRef.id, schoolName, email });
+    } catch (error) {
+      console.error("Error creating school:", error);
+      res.status(500).send({ message: error.message });
+    }
+  });  
+
 // Get all schools
 router.get("/", async (req, res) => {
   try {
     const snapshot = await req.db.collection("Schools").get();
     const schools = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    res.status(200).send(schools);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+// Get all schools with license count and status
+router.get("/admin", async (req, res) => {
+  try {
+    const schoolsSnapshot = await req.db.collection("Schools").get();
+    const schools = [];
+
+    for (const schoolDoc of schoolsSnapshot.docs) {
+      const schoolData = schoolDoc.data();
+      const licensesSnapshot = await schoolDoc.ref.collection("Licenses").get();
+      const licenseCount = licensesSnapshot.size;
+      const allLicensesActive =
+        licenseCount > 0 &&
+        licensesSnapshot.docs.every(
+          (licenseDoc) => licenseDoc.data().status === "active"
+        );
+
+      schools.push({
+        id: schoolDoc.id,
+        name: schoolData.schoolName,
+        email: schoolData.email,
+        licenses: licenseCount,
+        allLicensesActive: licenseCount === 0 ? false : allLicensesActive,
+      });
+    }
+
     res.status(200).send(schools);
   } catch (error) {
     res.status(500).send(error.message);
