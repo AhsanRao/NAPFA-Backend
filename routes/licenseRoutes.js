@@ -27,6 +27,40 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Add multiple licenses for a school
+router.post("/admin", async (req, res) => {
+  try {
+    const { numLicenses } = req.body;
+    const licenses = [];
+    for (let i = 0; i < numLicenses; i++) {
+      const status = "active"; // Default status
+      const issuedDate = new Date().toISOString();
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      const licenseRef = await req.db
+        .collection("Schools")
+        .doc(req.params.schoolId)
+        .collection("Licenses")
+        .add({
+          status,
+          issuedDate,
+          expiryDate: expiryDate.toISOString(),
+          deviceName: "none", // Default device name
+        });
+      licenses.push({
+        id: licenseRef.id,
+        status,
+        issuedDate,
+        expiryDate: expiryDate.toISOString(),
+        deviceName: "none",
+      });
+    }
+    res.status(201).send(licenses);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
 // Get all licenses for a school
 router.get("/", async (req, res) => {
   try {
