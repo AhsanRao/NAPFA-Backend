@@ -11,6 +11,7 @@ router.post('/', async (req, res) => {
       students.forEach(student => {
         const {
           id,
+          no,
           name,
           class: studentClass,
           gender,
@@ -32,6 +33,7 @@ router.post('/', async (req, res) => {
   
         batch.set(studentRef, {
           name,
+          no,
           class: studentClass,
           gender,
           dob,
@@ -97,6 +99,7 @@ router.put("/:id", async (req, res) => {
   try {
     const {
       name,
+      no,
       class: studentClass,
       gender,
       dob,
@@ -113,6 +116,7 @@ router.put("/:id", async (req, res) => {
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;
+    if (no !== undefined) updateData.no = no;
     if (studentClass !== undefined) updateData.class = studentClass;
     if (gender !== undefined) updateData.gender = gender;
     if (dob !== undefined) updateData.dob = dob;
