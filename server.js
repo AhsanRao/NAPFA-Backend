@@ -43,7 +43,7 @@ app.use("/api/schools/:schoolId/licenses", licenseRoutes);
 app.use("/api/schools/:schoolId/adminlogs", adminLogRoutes);
 app.use("/api/licenses", licenseUtils);
 
-const PORT = process.env.PORT || 5002;
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
 });
