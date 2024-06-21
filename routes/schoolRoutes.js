@@ -14,28 +14,40 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Create a new school admin portal
+// Create a new school admin portal and add 6 default licenses
 router.post("/admin", async (req, res) => {
-    try {
-      const { schoolName, email, createDefaultLicenses } = req.body;
-      const schoolRef = await req.db.collection("Schools").add({ schoolName, email });
-  
-      if (createDefaultLicenses) {
-        const licensesRef = schoolRef.collection("Licenses");
+  try {
+    const { schoolName, email, createDefaultLicenses } = req.body;
+    const schoolRef = await req.db.collection("Schools").add({ schoolName, email });
+
+    if (createDefaultLicenses) {
+      const licensesRef = schoolRef.collection("Licenses");
+      const licenses = [];
+      for (let i = 0; i < 6; i++) {
+        const issuedDate = new Date().toISOString();
+        const expiryDate = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString();
         const licenseRef = await licensesRef.add({
-          issuedDate: new Date().toISOString(),
-          expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
+          issuedDate,
+          expiryDate,
           status: "active",
-          deviceName: "",
+          deviceName: "N/A", // Default device name
+        });
+        licenses.push({
+          id: licenseRef.id,
+          issuedDate,
+          expiryDate,
+          status: "active",
+          deviceName: "N/A",
         });
       }
-  
-      res.status(201).send({ id: schoolRef.id, schoolName, email });
-    } catch (error) {
-      console.error("Error creating school:", error);
-      res.status(500).send({ message: error.message });
     }
-  });  
+
+    res.status(201).send({ id: schoolRef.id, schoolName, email });
+  } catch (error) {
+    console.error("Error creating school:", error);
+    res.status(500).send({ message: error.message });
+  }
+});
 
 // Get all schools
 router.get("/", async (req, res) => {
