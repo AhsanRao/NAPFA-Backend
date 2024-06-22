@@ -4,20 +4,18 @@ const router = express.Router({ mergeParams: true });
 // Create a new license for a school
 router.post("/", async (req, res) => {
   try {
-    const { status, issuedDate, expiryDate } = req.body;
+    const { issuedDate, expiryDate } = req.body;
     const licenseRef = await req.db
       .collection("Schools")
       .doc(req.params.schoolId)
       .collection("Licenses")
       .add({
-        status,
         issuedDate,
         expiryDate,
         deviceName: "none", // Set default device name to "none"
       });
     res.status(201).send({
       id: licenseRef.id,
-      status,
       issuedDate,
       expiryDate,
       deviceName: "none",
@@ -33,7 +31,6 @@ router.post("/admin", async (req, res) => {
     const { numLicenses } = req.body;
     const licenses = [];
     for (let i = 0; i < numLicenses; i++) {
-      const status = "active"; // Default status
       const issuedDate = new Date().toISOString();
       const expiryDate = new Date();
       expiryDate.setFullYear(expiryDate.getFullYear() + 1);
@@ -42,14 +39,12 @@ router.post("/admin", async (req, res) => {
         .doc(req.params.schoolId)
         .collection("Licenses")
         .add({
-          status,
           issuedDate,
           expiryDate: expiryDate.toISOString(),
           deviceName: "none", // Default device name
         });
       licenses.push({
         id: licenseRef.id,
-        status,
         issuedDate,
         expiryDate: expiryDate.toISOString(),
         deviceName: "none",
@@ -101,12 +96,12 @@ router.get("/:licenseId", async (req, res) => {
 // Update a license by ID for a school
 router.put("/:licenseId", async (req, res) => {
   try {
-    const { status, issuedDate, expiryDate } = req.body;
+    const { deviceName, issuedDate, expiryDate } = req.body;
 
     const updateData = {};
-    if (status !== undefined) updateData.status = status;
     if (issuedDate !== undefined) updateData.issuedDate = issuedDate;
     if (expiryDate !== undefined) updateData.expiryDate = expiryDate;
+    if (deviceName !== undefined) updateData.deviceName = deviceName;
 
     const licenseRef = req.db
       .collection("Schools")

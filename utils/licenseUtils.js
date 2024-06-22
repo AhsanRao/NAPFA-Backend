@@ -30,12 +30,17 @@ router.post('/check/:licenseKey', async (req, res) => {
       return res.status(404).send({ message: 'Invalid License!' });
     }
 
-    // Update the device name if provided
-    if (deviceName) {
-      await licenseDoc.ref.update({ deviceName });
-    }
-
     const licenseData = licenseDoc.data();
+
+    // Check the current device name and update if it's "None" or "N/A"
+    if (deviceName) {
+      if (licenseData.deviceName === "None" || licenseData.deviceName === "N/A") {
+        await licenseDoc.ref.update({ deviceName });
+      } else {
+        return res.status(400).send({ message: 'License already in use!' });
+      }
+    }
+    
     return res.status(200).send({
       licenseId: licenseDoc.id,
       schoolId: schoolId,

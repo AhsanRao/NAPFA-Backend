@@ -32,8 +32,8 @@ router.post('/', async (req, res) => {
         const studentRef = req.db.collection('Schools').doc(schoolId).collection('Students').doc(studentId);
   
         batch.set(studentRef, {
-          name,
           no,
+          name,
           class: studentClass,
           gender,
           dob,
@@ -98,8 +98,8 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const {
-      name,
       no,
+      name,
       class: studentClass,
       gender,
       dob,
@@ -115,8 +115,8 @@ router.put("/:id", async (req, res) => {
     } = req.body;
 
     const updateData = {};
-    if (name !== undefined) updateData.name = name;
     if (no !== undefined) updateData.no = no;
+    if (name !== undefined) updateData.name = name;
     if (studentClass !== undefined) updateData.class = studentClass;
     if (gender !== undefined) updateData.gender = gender;
     if (dob !== undefined) updateData.dob = dob;

@@ -29,14 +29,12 @@ router.post("/admin", async (req, res) => {
         const licenseRef = await licensesRef.add({
           issuedDate,
           expiryDate,
-          status: "active",
           deviceName: "N/A", // Default device name
         });
         licenses.push({
           id: licenseRef.id,
           issuedDate,
           expiryDate,
-          status: "active",
           deviceName: "N/A",
         });
       }
@@ -65,6 +63,7 @@ router.get("/admin", async (req, res) => {
   try {
     const schoolsSnapshot = await req.db.collection("Schools").get();
     const schools = [];
+    const currentDate = new Date();
 
     for (const schoolDoc of schoolsSnapshot.docs) {
       const schoolData = schoolDoc.data();
@@ -72,9 +71,11 @@ router.get("/admin", async (req, res) => {
       const licenseCount = licensesSnapshot.size;
       const allLicensesActive =
         licenseCount > 0 &&
-        licensesSnapshot.docs.every(
-          (licenseDoc) => licenseDoc.data().status === "active"
-        );
+        licensesSnapshot.docs.every((licenseDoc) => {
+          const licenseData = licenseDoc.data();
+          const expiryDate = licenseData.expiryDate ? new Date(licenseData.expiryDate) : null;
+          return expiryDate && expiryDate > currentDate;
+        });
 
       schools.push({
         id: schoolDoc.id,
@@ -118,15 +119,36 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// Delete a school by ID
+// Delete a school by ID and all its subcollections
 router.delete("/:id", async (req, res) => {
   try {
     const schoolRef = req.db.collection("Schools").doc(req.params.id);
+
+    // Get all subcollections
+    const subcollections = await schoolRef.listCollections();
+    for (const subcollection of subcollections) {
+      const subcollectionRef = schoolRef.collection(subcollection.id);
+
+      // Get all documents in the subcollection
+      const docs = await subcollectionRef.get();
+      const batch = req.db.batch();
+
+      docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      // Commit the batch
+      await batch.commit();
+    }
+
+    // Delete the school document
     await schoolRef.delete();
-    res.status(200).send("School deleted");
+
+    res.status(200).send("School and its subcollections deleted");
   } catch (error) {
     res.status(500).send(error.message);
   }
 });
 
 module.exports = router;
+
