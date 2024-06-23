@@ -7,6 +7,12 @@ router.post('/check/:licenseKey', async (req, res) => {
   try {
     const licenseKey = req.params.licenseKey;
     const { deviceName } = req.body;
+
+    // Check if deviceName is provided in the request body
+    if (!deviceName) {
+      return res.status(400).send({ message: 'deviceName is required' });
+    }
+    
     let licenseDoc = null;
     let schoolId = null;
     let schoolName = null;
@@ -31,6 +37,13 @@ router.post('/check/:licenseKey', async (req, res) => {
     }
 
     const licenseData = licenseDoc.data();
+
+    // Check if the license is expired
+    const expiryDate = licenseData.expiryDate;
+    const currentDate = new Date();
+    if (currentDate > expiryDate) {
+      return res.status(400).send({ message: 'License is expired!' });
+    }
 
     // Check the current device name and update if it's "None" or "N/A"
     if (deviceName) {

@@ -41,13 +41,13 @@ router.post("/admin", async (req, res) => {
         .add({
           issuedDate,
           expiryDate: expiryDate.toISOString(),
-          deviceName: "none", // Default device name
+          deviceName: "N/A", // Default device name
         });
       licenses.push({
         id: licenseRef.id,
         issuedDate,
         expiryDate: expiryDate.toISOString(),
-        deviceName: "none",
+        deviceName: "N/A",
       });
     }
     res.status(201).send(licenses);
@@ -116,6 +116,7 @@ router.put("/:licenseId", async (req, res) => {
 });
 
 // Delete a license by ID for a school
+// Update deviceName to "N/A" for a license by ID for a school
 router.delete("/:licenseId", async (req, res) => {
   try {
     const licenseRef = req.db
@@ -129,8 +130,11 @@ router.delete("/:licenseId", async (req, res) => {
       return res.status(404).send("License not found");
     }
 
-    await licenseRef.delete();
-    res.status(200).send("License deleted");
+    await licenseRef.update({
+      deviceName: "N/A"
+    });
+    
+    res.status(200).send("License Deleted");
   } catch (error) {
     res.status(500).send(error.message);
   }

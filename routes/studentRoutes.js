@@ -1,36 +1,116 @@
 const express = require("express");
 const router = express.Router({ mergeParams: true });
 
-// Create a new student
+// // Create a new student
+// router.post('/', async (req, res) => {
+//     try {
+//       const students = Array.isArray(req.body) ? req.body : [req.body];
+//       const schoolId = req.params.schoolId;
+//       const batch = req.db.batch();
+  
+//       students.forEach(student => {
+//         const {
+//           id,
+//           no,
+//           name,
+//           class: studentClass,
+//           gender,
+//           dob,
+//           attendanceStatus,
+//           sitUpReps,
+//           broadJumpCm,
+//           sitAndReachCm,
+//           pullUpReps,
+//           shuttleRunSec,
+//           runTime,
+//           pftTestDate,
+//           uploadDate
+//         } = student;
+  
+//         const studentId = id || req.db.collection('Schools').doc().id; // Use provided ID or generate a new one
+//         const currentUploadDate = uploadDate || admin.firestore.FieldValue.serverTimestamp();
+//         const studentRef = req.db.collection('Schools').doc(schoolId).collection('Students').doc(studentId);
+  
+//         batch.set(studentRef, {
+//           no,
+//           name,
+//           class: studentClass,
+//           gender,
+//           dob,
+//           attendanceStatus,
+//           sitUpReps,
+//           broadJumpCm,
+//           sitAndReachCm,
+//           pullUpReps,
+//           shuttleRunSec,
+//           runTime,
+//           pftTestDate,
+//           uploadDate: currentUploadDate
+//         }, { merge: true }); // Merge to overwrite existing data if the document exists
+//       });
+  
+//       await batch.commit();
+//       res.status(201).send({ message: 'Students added successfully' });
+//     } catch (error) {
+//       res.status(500).send(error.message);
+//     }
+//   });
+
+// Create or update multiple students
 router.post('/', async (req, res) => {
-    try {
-      const students = Array.isArray(req.body) ? req.body : [req.body];
-      const schoolId = req.params.schoolId;
-      const batch = req.db.batch();
-  
-      students.forEach(student => {
-        const {
-          id,
-          no,
-          name,
-          class: studentClass,
-          gender,
-          dob,
-          attendanceStatus,
-          sitUpReps,
-          broadJumpCm,
-          sitAndReachCm,
-          pullUpReps,
-          shuttleRunSec,
-          runTime,
-          pftTestDate,
-          uploadDate
-        } = student;
-  
-        const studentId = id || req.db.collection('Schools').doc().id; // Use provided ID or generate a new one
-        const currentUploadDate = uploadDate || admin.firestore.FieldValue.serverTimestamp();
-        const studentRef = req.db.collection('Schools').doc(schoolId).collection('Students').doc(studentId);
-  
+  try {
+    const students = Array.isArray(req.body) ? req.body : [req.body];
+    const schoolId = req.params.schoolId;
+    const batch = req.db.batch();
+
+    // Get all student IDs
+    const studentIds = students.map(student => student.id || req.db.collection('Schools').doc().id);
+
+    // Fetch all existing documents in one query
+    const studentsRef = req.db.collection('Schools').doc(schoolId).collection('Students');
+    const existingDocs = await studentsRef.where(admin.firestore.FieldPath.documentId(), 'in', studentIds).get();
+
+    const existingDocsMap = new Map();
+    existingDocs.forEach(doc => existingDocsMap.set(doc.id, doc));
+
+    students.forEach((student, index) => {
+      const {
+        id,
+        no,
+        name,
+        class: studentClass,
+        gender,
+        dob,
+        attendanceStatus,
+        sitUpReps,
+        broadJumpCm,
+        sitAndReachCm,
+        pullUpReps,
+        shuttleRunSec,
+        runTime,
+        pftTestDate,
+        uploadDate
+      } = student;
+
+      const studentId = studentIds[index];
+      const currentUploadDate = uploadDate || admin.firestore.FieldValue.serverTimestamp();
+      const studentRef = studentsRef.doc(studentId);
+
+      if (existingDocsMap.has(studentId)) {
+        // Document exists, update only non-negative values
+        const updateData = {};
+        Object.entries({
+          no, name, class: studentClass, gender, dob, attendanceStatus,
+          sitUpReps, broadJumpCm, sitAndReachCm, pullUpReps, shuttleRunSec, runTime, pftTestDate
+        }).forEach(([key, value]) => {
+          if (value !== -1 && value !== undefined) {
+            updateData[key] = value;
+          }
+        });
+        updateData.uploadDate = currentUploadDate;
+        batch.update(studentRef, updateData);
+      } else {
+        // Document doesn't exist, add all data
         batch.set(studentRef, {
           no,
           name,
@@ -46,15 +126,16 @@ router.post('/', async (req, res) => {
           runTime,
           pftTestDate,
           uploadDate: currentUploadDate
-        }, { merge: true }); // Merge to overwrite existing data if the document exists
-      });
-  
-      await batch.commit();
-      res.status(201).send({ message: 'Students added successfully' });
-    } catch (error) {
-      res.status(500).send(error.message);
-    }
-  });
+        });
+      }
+    });
+
+    await batch.commit();
+    res.status(201).send({ message: 'Students added/updated successfully' });
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
   
 
 // Get all students in a school
