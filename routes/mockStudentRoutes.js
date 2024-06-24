@@ -1,36 +1,74 @@
 const express = require("express");
 const router = express.Router({ mergeParams: true });
+const admin = require('firebase-admin');
 
-// Create a new mock student
+// Helper function to remove undefined values from an object
+const removeUndefined = (obj) => 
+  Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
+
+// Create or update multiple students
 router.post('/', async (req, res) => {
-    try {
-      const students = Array.isArray(req.body) ? req.body : [req.body];
-      const schoolId = req.params.schoolId;
-      const batch = req.db.batch();
-  
-      students.forEach(student => {
-        const {
-          id,
+  try {
+    const students = Array.isArray(req.body) ? req.body : [req.body];
+    const schoolId = req.params.schoolId;
+    const batch = req.db.batch();
+
+    // Get all student IDs
+    const studentIds = students.map(student => student.id || req.db.collection('Schools').doc().id);
+
+    // Fetch all existing documents in one query
+    const studentsRef = req.db.collection('Schools').doc(schoolId).collection('MockStudents');
+    const existingDocs = await studentsRef.where(admin.firestore.FieldPath.documentId(), 'in', studentIds).get();
+
+    const existingDocsMap = new Map();
+    existingDocs.forEach(doc => existingDocsMap.set(doc.id, doc));
+
+    students.forEach((student, index) => {
+      const {
+        id,
+        no,
+        name,
+        class: studentClass,
+        gender,
+        dob,
+        attendanceStatus,
+        sitUpReps,
+        broadJumpCm,
+        sitAndReachCm,
+        pullUpReps,
+        shuttleRunSec,
+        runTime,
+        pftTestDate,
+        uploadDate
+      } = student;
+
+      const studentId = studentIds[index];
+      const currentUploadDate = uploadDate || admin.firestore.FieldValue.serverTimestamp();
+      const studentRef = studentsRef.doc(studentId);
+
+      if (existingDocsMap.has(studentId)) {
+        // Document exists, update only non-negative values
+        const updateData = removeUndefined({
+          no,
           name,
           class: studentClass,
           gender,
           dob,
           attendanceStatus,
-          sitUpReps,
-          broadJumpCm,
-          sitAndReachCm,
-          pullUpReps,
-          shuttleRunSec,
-          runTime,
+          sitUpReps: sitUpReps !== -1 ? sitUpReps : undefined,
+          broadJumpCm: broadJumpCm !== -1 ? broadJumpCm : undefined,
+          sitAndReachCm: sitAndReachCm !== -1 ? sitAndReachCm : undefined,
+          pullUpReps: pullUpReps !== -1 ? pullUpReps : undefined,
+          shuttleRunSec: shuttleRunSec !== -1 ? shuttleRunSec : undefined,
+          runTime: runTime !== -1 ? runTime : undefined,
           pftTestDate,
-          uploadDate
-        } = student;
-  
-        const studentId = id || req.db.collection('Schools').doc().id; // Use provided ID or generate a new one
-        const currentUploadDate = uploadDate || admin.firestore.FieldValue.serverTimestamp();
-        const studentRef = req.db.collection('Schools').doc(schoolId).collection('MockStudents').doc(studentId);
-  
-        batch.set(studentRef, {
+          uploadDate: currentUploadDate
+        });
+        batch.update(studentRef, updateData);
+      } else {
+        // Document doesn't exist, add all data
+        const newStudentData = removeUndefined({
+          no,
           name,
           class: studentClass,
           gender,
@@ -44,16 +82,17 @@ router.post('/', async (req, res) => {
           runTime,
           pftTestDate,
           uploadDate: currentUploadDate
-        }, { merge: true }); // Merge to overwrite existing data if the document exists
-      });
-  
-      await batch.commit();
-      res.status(201).send({ message: 'Mock Students added successfully' });
-    } catch (error) {
-      res.status(500).send(error.message);
-    }
-  });
-  
+        });
+        batch.set(studentRef, newStudentData);
+      }
+    });
+
+    await batch.commit();
+    res.status(201).send({ message: 'Mock Students added/updated successfully' });
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
 
 // Get all mock students in a school
 router.get("/", async (req, res) => {
@@ -96,6 +135,7 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const {
+      no,
       name,
       class: studentClass,
       gender,
