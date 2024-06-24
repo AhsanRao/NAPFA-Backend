@@ -1,4 +1,4 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router({ mergeParams: true });
 const admin = require('firebase-admin');
 
@@ -6,26 +6,60 @@ const admin = require('firebase-admin');
 const removeUndefined = (obj) => 
   Object.fromEntries(Object.entries(obj).filter(([_, v]) => v !== undefined));
 
-// Create or update multiple students
-router.post('/', async (req, res) => {
-  try {
-    const students = Array.isArray(req.body) ? req.body : [req.body];
-    const schoolId = req.params.schoolId;
-    const batch = req.db.batch();
+// Helper function to process students in batches
+async function processBatch(studentsRef, studentBatch, db) {
+  const batch = db.batch();
+  const studentIds = studentBatch.map(student => student.id || db.collection('Schools').doc().id);
 
-    // Get all student IDs
-    const studentIds = students.map(student => student.id || req.db.collection('Schools').doc().id);
+  // Fetch existing documents for this batch
+  const existingDocs = await studentsRef.where(admin.firestore.FieldPath.documentId(), 'in', studentIds).get();
+  const existingDocsMap = new Map(existingDocs.docs.map(doc => [doc.id, doc]));
 
-    // Fetch all existing documents in one query
-    const studentsRef = req.db.collection('Schools').doc(schoolId).collection('Students');
-    const existingDocs = await studentsRef.where(admin.firestore.FieldPath.documentId(), 'in', studentIds).get();
+  studentBatch.forEach((student, index) => {
+    const {
+      id,
+      no,
+      name,
+      class: studentClass,
+      gender,
+      dob,
+      attendanceStatus,
+      sitUpReps,
+      broadJumpCm,
+      sitAndReachCm,
+      pullUpReps,
+      shuttleRunSec,
+      runTime,
+      pftTestDate,
+      uploadDate
+    } = student;
 
-    const existingDocsMap = new Map();
-    existingDocs.forEach(doc => existingDocsMap.set(doc.id, doc));
+    const studentId = studentIds[index];
+    const currentUploadDate = uploadDate || admin.firestore.FieldValue.serverTimestamp();
+    const studentRef = studentsRef.doc(studentId);
 
-    students.forEach((student, index) => {
-      const {
-        id,
+    if (existingDocsMap.has(studentId)) {
+      // Document exists, update only non-negative values
+      const updateData = removeUndefined({
+        no,
+        name,
+        class: studentClass,
+        gender,
+        dob,
+        attendanceStatus,
+        sitUpReps: sitUpReps !== -1 ? sitUpReps : undefined,
+        broadJumpCm: broadJumpCm !== -1 ? broadJumpCm : undefined,
+        sitAndReachCm: sitAndReachCm !== -1 ? sitAndReachCm : undefined,
+        pullUpReps: pullUpReps !== -1 ? pullUpReps : undefined,
+        shuttleRunSec: shuttleRunSec !== -1 ? shuttleRunSec : undefined,
+        runTime: runTime !== -1 ? runTime : undefined,
+        pftTestDate,
+        uploadDate: currentUploadDate
+      });
+      batch.update(studentRef, updateData);
+    } else {
+      // Document doesn't exist, add all data
+      const newStudentData = removeUndefined({
         no,
         name,
         class: studentClass,
@@ -39,55 +73,28 @@ router.post('/', async (req, res) => {
         shuttleRunSec,
         runTime,
         pftTestDate,
-        uploadDate
-      } = student;
+        uploadDate: currentUploadDate
+      });
+      batch.set(studentRef, newStudentData);
+    }
+  });
 
-      const studentId = studentIds[index];
-      const currentUploadDate = uploadDate || admin.firestore.FieldValue.serverTimestamp();
-      const studentRef = studentsRef.doc(studentId);
+  await batch.commit();
+}
 
-      if (existingDocsMap.has(studentId)) {
-        // Document exists, update only non-negative values
-        const updateData = removeUndefined({
-          no,
-          name,
-          class: studentClass,
-          gender,
-          dob,
-          attendanceStatus,
-          sitUpReps: sitUpReps !== -1 ? sitUpReps : undefined,
-          broadJumpCm: broadJumpCm !== -1 ? broadJumpCm : undefined,
-          sitAndReachCm: sitAndReachCm !== -1 ? sitAndReachCm : undefined,
-          pullUpReps: pullUpReps !== -1 ? pullUpReps : undefined,
-          shuttleRunSec: shuttleRunSec !== -1 ? shuttleRunSec : undefined,
-          runTime: runTime !== -1 ? runTime : undefined,
-          pftTestDate,
-          uploadDate: currentUploadDate
-        });
-        batch.update(studentRef, updateData);
-      } else {
-        // Document doesn't exist, add all data
-        const newStudentData = removeUndefined({
-          no,
-          name,
-          class: studentClass,
-          gender,
-          dob,
-          attendanceStatus,
-          sitUpReps,
-          broadJumpCm,
-          sitAndReachCm,
-          pullUpReps,
-          shuttleRunSec,
-          runTime,
-          pftTestDate,
-          uploadDate: currentUploadDate
-        });
-        batch.set(studentRef, newStudentData);
-      }
-    });
+// Create or update multiple students
+router.post('/', async (req, res) => {
+  try {
+    const students = Array.isArray(req.body) ? req.body : [req.body];
+    const schoolId = req.params.schoolId;
+    const studentsRef = req.db.collection('Schools').doc(schoolId).collection('Students');
 
-    await batch.commit();
+    // Process students in batches of 30
+    for (let i = 0; i < students.length; i += 30) {
+      const studentBatch = students.slice(i, i + 30);
+      await processBatch(studentsRef, studentBatch, req.db);
+    }
+
     res.status(201).send({ message: 'Students added/updated successfully' });
   } catch (error) {
     res.status(500).send(error.message);
