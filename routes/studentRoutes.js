@@ -202,4 +202,31 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// Delete all students in school
+router.delete("/", async (req, res) => {
+  try {
+    const studentsRef = req.db
+      .collection("Schools")
+      .doc(req.params.schoolId)
+      .collection("Students");
+    const snapshot = await studentsRef.get();
+    const batch = req.db.batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    const mockStudentsRef = req.db
+      .collection("Schools")
+      .doc(req.params.schoolId)
+      .collection("MockStudents");
+    const mockSnapshot = await mockStudentsRef.get();
+    const mockBatch = req.db.batch();
+    mockSnapshot.docs.forEach((doc) => mockBatch.delete(doc.ref));
+    await mockBatch.commit();
+
+    res.status(200).send("All students deleted");
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
 module.exports = router;
