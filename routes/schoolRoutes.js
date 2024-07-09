@@ -59,15 +59,52 @@ router.get("/", async (req, res) => {
 });
 
 // Get all schools with license count and status
+// router.get("/admin", async (req, res) => {
+//   try {
+//     const schoolsSnapshot = await req.db.collection("Schools").get();
+//     const schools = [];
+//     const currentDate = new Date();
+
+//     for (const schoolDoc of schoolsSnapshot.docs) {
+//       const schoolData = schoolDoc.data();
+//       const licensesSnapshot = await schoolDoc.ref.collection("Licenses").get();
+//       const licenseCount = licensesSnapshot.size;
+//       const allLicensesActive =
+//         licenseCount > 0 &&
+//         licensesSnapshot.docs.every((licenseDoc) => {
+//           const licenseData = licenseDoc.data();
+//           const expiryDate = licenseData.expiryDate ? new Date(licenseData.expiryDate) : null;
+//           return expiryDate && expiryDate > currentDate;
+//         });
+
+//       schools.push({
+//         id: schoolDoc.id,
+//         name: schoolData.schoolName,
+//         email: schoolData.email,
+//         licenses: licenseCount,
+//         allLicensesActive: licenseCount === 0 ? false : allLicensesActive,
+//       });
+//     }
+
+//     res.status(200).send(schools);
+//   } catch (error) {
+//     res.status(500).send(error.message);
+//   }
+// });
+
 router.get("/admin", async (req, res) => {
   try {
     const schoolsSnapshot = await req.db.collection("Schools").get();
+
     const schools = [];
     const currentDate = new Date();
 
     for (const schoolDoc of schoolsSnapshot.docs) {
       const schoolData = schoolDoc.data();
+
       const licensesSnapshot = await schoolDoc.ref.collection("Licenses").get();
+      
+      const licenseIds = licensesSnapshot.docs.map(doc => doc.id);
       const licenseCount = licensesSnapshot.size;
       const allLicensesActive =
         licenseCount > 0 &&
@@ -82,6 +119,7 @@ router.get("/admin", async (req, res) => {
         name: schoolData.schoolName,
         email: schoolData.email,
         licenses: licenseCount,
+        licenseIds: licenseIds,
         allLicensesActive: licenseCount === 0 ? false : allLicensesActive,
       });
     }
